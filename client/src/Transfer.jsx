@@ -1,26 +1,45 @@
 import { useState } from "react";
 import server from "./server";
+import * as secp from "ethereum-cryptography/secp256k1";
+import { toHex, utf8ToBytes } from "ethereum-cryptography/utils";
 
-function Transfer({ address, setBalance }) {
+function Transfer({ address, setBalance, privateKey }) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
 
   const setValue = (setter) => (evt) => setter(evt.target.value);
+  
+  // Function to sign the message with the private key
+  const signMessage = (message, address) => {
+    const signature = secp.secp256k1.sign(message,address);
+    return signature;
+  };
 
   async function transfer(evt) {
     evt.preventDefault();
+
+    const message = JSON.stringify({
+      sender: address,
+      recipient,
+      amount: parseInt(sendAmount),
+    });
+    // Sign the message with the private key
+    const signature = signMessage(utf8ToBytes(message), privateKey);
+    console.log('signature: ', toHex(utf8ToBytes(signature.toString())));
 
     try {
       const {
         data: { balance },
       } = await server.post(`send`, {
-        sender: address,
+        sender: JSON.stringify(signature, (_, v) => typeof v === 'bigint' ? v.toString() : v),
         amount: parseInt(sendAmount),
         recipient,
       });
+      console.log('balance: ', balance);
       setBalance(balance);
     } catch (ex) {
-      alert(ex.response.data.message);
+      console.log(ex);
+      // alert(ex.response.data.message);
     }
   }
 
